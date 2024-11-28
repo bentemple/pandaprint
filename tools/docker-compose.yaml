@@ -1,0 +1,25 @@
+services:
+  mqtt:
+    image: "docker.io/eclipse-mosquitto:2.0.20"
+    volumes:
+      - "./ca:/ca"
+      - "./mosquitto_conf/:/mosquitto/config/"
+    ports:
+      - "8883:8883"
+    entrypoint: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+  ftp:
+    build:
+      context: .
+      dockerfile: Dockerfile-ftp
+    environment:
+      FTP_USER: 'bblp'
+      FTP_PASS: '5678'
+      LOG_STDOUT: '1'
+      PASV_MIN_PORT: 10100
+      PASV_MAX_PORT: 10110
+    volumes:
+      - "./ca:/ca"
+    ports:
+      - "990:990"
+      - "10100-10110:10100-10110"
+    #entrypoint: ["sleep", "900"]

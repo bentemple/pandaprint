@@ -1,0 +1,4 @@
+FROM docker.io/fauria/vsftpd@sha256:6d71d7c7f1b0ab2844ec7dc7999a30aef6d758b6d8179cf5967513f87c79c177
+
+ADD ./vsftpd_conf/vsftpd.conf /etc/vsftpd/vsftpd.conf
+RUN mkdir -p /home/vsftpd/bblp/model && chown ftp.ftp /home/vsftpd/bblp/model

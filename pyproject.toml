@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "pandaprint"
+version = "1.0.0"
+description = ""
+authors = ["James E. Blair <corvus@gnu.org>"]
+readme = "README.rst"
+
+[tool.poetry.scripts]
+pandaprint = "pandaprint.server:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+cherrypy = "^18.10.0"
+routes = "^2.5.1"
+pyyaml = "^6.0.2"
+paho-mqtt = "^2.1.0"
+pbr = "^6.1.0"
+
+[tool.poetry.group.test.dependencies]
+stestr = "^4.1.0"
+requests = "^2.32.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.stestr]
+test_path = "./tests"
+top_dir = "./"

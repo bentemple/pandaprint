@@ -1,0 +1,7 @@
+services:
+  pandaprint:
+    image: "quay.io/pandaprint/pandaprint:latest"
+    volumes:
+      - "./printers.yaml:/config/printers.yaml"
+    ports:
+      - "8080:8080"

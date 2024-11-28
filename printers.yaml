@@ -1,0 +1,5 @@
+printers:
+  - name: bambu
+    host: bambu.lan
+    serial: 'SERIAL NUMBER'
+    key: 'ACCESS KEY'
