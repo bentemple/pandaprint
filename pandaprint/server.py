@@ -15,11 +15,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import random
-import string
-import logging
-import ssl
 import json
+import logging
+import random
+import shutil
+import ssl
+import string
+import tempfile
+import zipfile
 
 import cherrypy
 import ftplib
@@ -118,19 +121,62 @@ class PrintAPI:
             'text': 'OctoPrint 1.1.0 (PandaPrint 1.0)',
         }
 
+    def _parse_file(self, fp):
+        filename = fp.filename
+        basename = filename.rsplit('.', 1)[0]
+        with tempfile.TemporaryFile() as f:
+            shutil.copyfileobj(fp.file, f)
+            with zipfile.ZipFile(f) as zf:
+                gcode_files = [x for x in zf.namelist() if x.startswith('Metadata/') and x.endswith('.gcode')]
+                if len(gcode_files) == 1:
+                    # There's only one plate, send the original file
+                    f.seek(0)
+                    yield filename, f
+                    return
+                for plate_no in range(1, len(gcode_files)+1):
+                    # Split the plate into multiple files
+                    plate = []
+                    for fn in zf.namelist():
+                        if fn.startswith('Metadata/'):
+                            base, ext = fn.split('.', 1)
+                            if str(plate_no) in base:
+                                plate.append(fn)
+                        else:
+                            # This file is not plate-specific
+                            plate.append(fn)
+                    # Make a new zipfile
+                    with tempfile.TemporaryFile() as outf:
+                        with zipfile.ZipFile(outf, mode='w') as outzf:
+                            for fn in plate:
+                                base, ext = fn.split('.', 1)
+                                # Rename every plate "plate_1".  Only
+                                # the base, not the extension (.md5
+                                # may be present).
+                                base = base.replace(str(plate_no), '1')
+                                outfn = f'{base}.{ext}'
+                                outzf.writestr(outfn, zf.read(fn))
+                        outf.seek(0)
+                        yield f'{basename}-{plate_no}.3mf', outf
+
     @cherrypy.expose
     def upload(self, pname, location, **kw):
         # https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
         printer = self.printers[pname]
         do_print = str(kw.get('print', False)).lower() == 'true'
         fp = kw['file']
-        filename = fp.filename
+
+
         # ftps upload
+        first_filename = None
         with FTPS() as ftp:
             ftp.connect(host=printer.host, port=990, timeout=30)
             ftp.login('bblp', printer.key)
             ftp.prot_p()
-            ftp.storbinary(f'STOR /model/{filename}', fp.file)
+            for newfilename, newfp in self._parse_file(fp):
+                if first_filename is None:
+                    first_filename = newfilename
+                ftp.storbinary(f'STOR /model/{newfilename}', newfp)
+
         if do_print:
             printer.mqtt.send_json(
                 f'device/{printer.serial}/request',
@@ -146,7 +192,7 @@ class PrintAPI:
                         "subtask_name": "",
 
                         #"file": filename,
-                        "url":  f"file:///sdcard/model/{filename}",
+                        "url":  f"file:///sdcard/model/{first_filename}",
                         #"md5": "",
 
                         "bed_type": "auto",

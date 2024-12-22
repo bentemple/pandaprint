@@ -14,19 +14,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import threading
-import io
-import testtools
-import fixtures
-import pandaprint.server
 import cherrypy
-import socket
-import requests
 import collections
-import paho.mqtt.client as mqtt
-import ssl
-import uuid
+import fixtures
+import ftplib
+import io
 import json
+import logging
+import paho.mqtt.client as mqtt
+import pandaprint.server
+import requests
+import socket
+import ssl
+import testtools
+import threading
+import uuid
+import zipfile
+
 
 def get_config():
     name = uuid.uuid4().hex
@@ -103,8 +107,25 @@ def get_ftp_file(path):
         ftp.login('bblp', '5678')
         ftp.prot_p()
         with io.BytesIO() as f:
-            ftp.retrbinary(f'RETR {path}', f.write)
+            try:
+                ftp.retrbinary(f'RETR {path}', f.write)
+            except ftplib.error_perm:
+                # No file
+                return None
             return f.getvalue()
+
+
+def make_zip_file(plates=1):
+    with io.BytesIO() as f:
+        with zipfile.ZipFile(f, mode='w') as zf:
+            for pno in range(1, plates+1):
+                zf.writestr(f'Metadata/plate_{pno}.png', b'PNG')
+                zf.writestr(f'Metadata/plate_{pno}.gcode', f'G0X{pno}\n'.encode('utf8'))
+            zf.writestr('3D/3dmodel.model', b'')
+            zf.writestr('[Content_Types].xml', b'')
+            zf.writestr('_rels/.rels', b'')
+        return f.getvalue()
+
 
 class TestServer(testtools.TestCase):
     def test_server_version(self):
@@ -124,18 +145,57 @@ class TestServer(testtools.TestCase):
         )
 
     def test_upload_only(self):
+        filename = 'test_upload.3mf'
         config = get_config()
         name = config['printers'][0]['name']
         server = self.useFixture(PandaServerFixture(config))
         url = f'http://localhost:{server.port}/{name}/api/files/local'
 
-        files = {'file': ('test_upload.gcode', 'G0X0\n')}
+        testfile = make_zip_file()
+        files = {'file': (filename, testfile)}
         resp = requests.post(url, files=files)
         self.assertEqual(201, resp.status_code)
-        data = get_ftp_file('/model/test_upload.gcode')
-        self.assertEqual(b'G0X0\n', data)
+        data = get_ftp_file(f'/model/{filename}')
+        self.assertEqual(testfile, data)
+
+    def test_upload_multiple(self):
+        filename = 'test_multiple.3mf'
+        config = get_config()
+        name = config['printers'][0]['name']
+        server = self.useFixture(PandaServerFixture(config))
+        url = f'http://localhost:{server.port}/{name}/api/files/local'
+
+        testfile = make_zip_file(2)
+        files = {'file': (filename, testfile)}
+        resp = requests.post(url, files=files)
+        self.assertEqual(201, resp.status_code)
+        data = get_ftp_file(f'/model/{filename}')
+        self.assertIsNone(data)
+        data = get_ftp_file(f'/model/test_multiple-1.3mf')
+        with io.BytesIO(data) as f:
+            with zipfile.ZipFile(f) as zf:
+                names = zf.namelist()
+                self.assertIn('3D/3dmodel.model', names)
+                self.assertIn('Metadata/plate_1.gcode', names)
+                self.assertIn('Metadata/plate_1.png', names)
+                self.assertNotIn('Metadata/plate_2.gcode', names)
+                self.assertNotIn('Metadata/plate_2.png', names)
+                plate = zf.read('Metadata/plate_1.gcode')
+                self.assertEqual(b'G0X1\n', plate)
+        data = get_ftp_file(f'/model/test_multiple-2.3mf')
+        with io.BytesIO(data) as f:
+            with zipfile.ZipFile(f) as zf:
+                names = zf.namelist()
+                self.assertIn('3D/3dmodel.model', names)
+                self.assertIn('Metadata/plate_1.gcode', names)
+                self.assertIn('Metadata/plate_1.png', names)
+                self.assertNotIn('Metadata/plate_2.gcode', names)
+                self.assertNotIn('Metadata/plate_2.png', names)
+                plate = zf.read('Metadata/plate_1.gcode')
+                self.assertEqual(b'G0X2\n', plate)
 
     def test_upload_and_print(self):
+        filename = 'test_print.3mf'
         config = get_config()
         mqtt_fix = self.useFixture(MQTTFixture())
         name = config['printers'][0]['name']
@@ -143,11 +203,12 @@ class TestServer(testtools.TestCase):
         server = self.useFixture(PandaServerFixture(config))
         url = f'http://localhost:{server.port}/{name}/api/files/local'
 
-        files = {'file': ('test_print.gcode', 'G0X0\n')}
+        testfile = make_zip_file()
+        files = {'file': (filename, testfile)}
         resp = requests.post(url, files=files, data={'print': 'true'})
         self.assertEqual(201, resp.status_code)
-        data = get_ftp_file('/model/test_upload.gcode')
-        self.assertEqual(b'G0X0\n', data)
+        data = get_ftp_file(f'/model/{filename}')
+        self.assertEqual(testfile, data)
         msgs = [json.loads(x) for x in mqtt_fix.get_messages(f'device/{serial}/request')]
         self.assertEqual(
              [{
@@ -160,7 +221,7 @@ class TestServer(testtools.TestCase):
                      "task_id": "0",
                      "subtask_id": "0",
                      "subtask_name": "",
-                     "url": "file:///sdcard/model/test_print.gcode",
+                     "url": f"file:///sdcard/model/{filename}",
                      "bed_type": "auto"
                  }
              }],
