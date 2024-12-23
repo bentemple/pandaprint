@@ -42,6 +42,7 @@ def get_config():
                 'host': 'localhost',
                 'serial': serial,
                 'key': '5678',
+                'use_ams': True,
             }
         ],
         'listen-port': 0,
@@ -222,7 +223,8 @@ class TestServer(testtools.TestCase):
                      "subtask_id": "0",
                      "subtask_name": "",
                      "url": f"file:///sdcard/model/{filename}",
-                     "bed_type": "auto"
+                     "bed_type": "auto",
+                     "use_ams": True,
                  }
              }],
             msgs)

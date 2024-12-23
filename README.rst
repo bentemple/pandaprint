@@ -37,6 +37,25 @@ The fields are as follows:
 **key**: The access key for the printer.  Get this from the LAN mode
  screen.
 
+The following fields are optional and are used to configure printing
+options when "Upload and Print" is used from the slicer.  They have no
+effect for files that are merely uploaded.
+
+**timelapse**: Enable timelapse video (true/false).
+
+**bed_levelling**: Perform bed levelling (true/false).
+
+**flow_cali**: Perform flow calibration (true/false).
+
+**vibration_cali**: Perform vibration calibration (true/false).
+
+**layer_inspect**: Enable layer inspection (true/false).
+
+**use_ams**: Use the AMS instead of the external spool (true/false).
+ No AMS mapping is performed, so be sure that the spool numbers in the
+ slicer match the actual contents of the AMS when using "Upload and
+ Print".
+
 Running
 =======
 

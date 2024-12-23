@@ -3,3 +3,9 @@ printers:
     host: bambu.lan
     serial: 'SERIAL NUMBER'
     key: 'ACCESS KEY'
+    # timelapse: false
+    # bed_levelling: true
+    # flow_cali: true
+    # vibration_cali: true
+    # layer_inspect: true
+    # use_ams: true

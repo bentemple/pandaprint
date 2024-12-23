@@ -94,13 +94,32 @@ class MQTT:
         self.client.disconnect()
         self.client.loop_stop()
 
+
 class Printer:
     def __init__(self, printer):
         self.name = str(printer['name'])
         self.host = str(printer['host'])
         self.serial = str(printer['serial'])
         self.key = str(printer['key'])
-        self.mqtt = MQTT(self.host, 'bblp', self.key)
+        self._mqtt = None
+
+        self.print_options = {}
+        for k in (
+            'timelapse',
+            'bed_levelling',
+            'flow_cali',
+            'vibration_cali',
+            'layer_inspect',
+            'use_ams',
+        ):
+            if k in printer:
+                self.print_options[k] = bool(printer[k])
+
+    @property
+    def mqtt(self):
+        if not self._mqtt:
+            self._mqtt = MQTT(self.host, 'bblp', self.key)
+        return self._mqtt
 
 
 class PrintAPI:
@@ -115,6 +134,8 @@ class PrintAPI:
     @cherrypy.tools.json_out()
     def version(self, pname):
         printer = self.printers[pname]
+        # Make sure we can contact the mqtt server
+        printer.mqtt
         return {
             'api': '1.1.0',
             'server': '1.1.0',
@@ -178,33 +199,29 @@ class PrintAPI:
                 ftp.storbinary(f'STOR /model/{newfilename}', newfp)
 
         if do_print:
+            print_data = {
+                "sequence_id": "0",
+                "command": "project_file",
+                "param": "Metadata/plate_1.gcode",
+                "project_id": "0",
+                "profile_id": "0",
+                "task_id": "0",
+                "subtask_id": "0",
+                "subtask_name": "",
+
+                #"file": filename,
+                "url":  f"file:///sdcard/model/{first_filename}",
+                #"md5": "",
+
+                "bed_type": "auto",
+                #"ams_mapping": "",
+            }
+            print_data.update(printer.print_options)
+
             printer.mqtt.send_json(
                 f'device/{printer.serial}/request',
                 {
-                    "print": {
-                        "sequence_id": "0",
-                        "command": "project_file",
-                        "param": "Metadata/plate_1.gcode",
-                        "project_id": "0",
-                        "profile_id": "0",
-                        "task_id": "0",
-                        "subtask_id": "0",
-                        "subtask_name": "",
-
-                        #"file": filename,
-                        "url":  f"file:///sdcard/model/{first_filename}",
-                        #"md5": "",
-
-                        "bed_type": "auto",
-
-                        #"timelapse": True,
-                        #"bed_levelling": True,
-                        #"flow_cali": True,
-                        #"vibration_cali": True,
-                        #"layer_inspect": True,
-                        #"ams_mapping": "",
-                        #"use_ams": false,
-                    }
+                    "print": print_data
                 }
             )
         cherrypy.response.status = "201 Resource Created"
