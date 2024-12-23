@@ -9,8 +9,13 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV POETRY_CACHE_DIR=/opt/.cache
 
+RUN apt-get update \
+     && apt-get install -y git \
+     && apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+
 RUN python3 -m venv /poetry-env &&\
-    /poetry-env/bin/pip install poetry
+    /poetry-env/bin/pip install poetry poetry-dynamic-versioning
 
 COPY . /app
 WORKDIR /app

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pandaprint"
-version = "1.0.0"
+version = "0.0.0"
 description = ""
 authors = ["James E. Blair <corvus@gnu.org>"]
 readme = "README.rst"
@@ -20,9 +20,13 @@ pbr = "^6.1.0"
 stestr = "^4.1.0"
 requests = "^2.32.3"
 
+[tool.poetry-dynamic-versioning]
+enable = true
+pattern = "default-unprefixed"
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.stestr]
 test_path = "./tests"
