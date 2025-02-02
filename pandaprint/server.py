@@ -32,9 +32,6 @@ import paho.mqtt.client as mqtt
 # MQTT API reference:
 # https://github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md
 
-def noop():
-    pass
-
 
 # This class is based on:
 # https://stackoverflow.com/questions/12164470/python-ftp-implicit-tls-connection-issue
@@ -64,8 +61,6 @@ class FTPS(ftplib.FTP_TLS):
         conn = self.sock.context.wrap_socket(
             conn, server_hostname=self.host, session=self.sock.session
         )
-        # Superclass will try to unwrap the socket after transfer
-        conn.unwrap = noop
         return conn, size
 
     def makepasv(self):
